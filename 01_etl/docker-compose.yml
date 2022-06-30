@@ -1,0 +1,51 @@
+version: '3'
+
+services:
+  db:
+    image: postgres:14.3
+    volumes:
+      - movies_postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+
+  web:
+    build: ./app
+    volumes:
+      - static:/var/www/static
+      - media:/var/www/media
+    expose:
+      - "8000"
+    depends_on:
+      - db
+
+  nginx:
+    build: ./nginx
+    volumes:
+      - static:/var/www/static
+      - media:/var/www/media
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+
+  transfer:
+    build: ./postgres_to_es
+    depends_on:
+      - db
+
+  elastic:
+    image: elastic/elasticsearch:7.7.0
+    ports:
+      - "9200:9200"
+    environment:
+      - 'ES_JAVA_OPTS=-Xms200m -Xmx200m'
+      - 'discovery.type=single-node'
+
+volumes:
+  movies_postgres:
+  static:
+  media:
