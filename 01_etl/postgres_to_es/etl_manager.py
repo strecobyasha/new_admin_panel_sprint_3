@@ -11,9 +11,13 @@
 
 """
 
+import time
+from http import HTTPStatus
+
 from extractor import Extractor
 from json_state import State
 from loader import Loader
+from logger import manager_logger as logger
 from transformer import Transformer
 
 
@@ -37,11 +41,15 @@ def transfer():
         response = loader.connector(data=data_to_load)
 
         # Изменение значения времени последнего обновления данных в ES.
-        if response and response.status_code == 200:
+        if response and response.status_code == HTTPStatus.OK:
             state.set_state('modified_at', modified_at)
 
     extractor.close_connection()
 
 
 if __name__ == '__main__':
-    transfer()
+    while True:
+        logger.info('Запуск трансфера данных.')
+        transfer()
+        logger.info('Трансфер данных завершен.')
+        time.sleep(60)

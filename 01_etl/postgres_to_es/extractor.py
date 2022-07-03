@@ -18,31 +18,31 @@
 
 """
 
-import os
 from datetime import datetime
-from pathlib import Path
+from typing import Generator
 
 import psycopg2
-from dotenv import load_dotenv
+from pydantic import BaseSettings, Field
 
 from backoff import backoff
 from logger import extractor_logger as logger
 
-path = Path(__file__).resolve().parent
-load_dotenv(''.join([str(path), '/.env']))
-
-
 BATCH_SIZE = 100
 
 
-params = {
-    'dbname': os.environ.get('DB_NAME'),
-    'user': os.environ.get('DB_USER'),
-    'password': os.environ.get('DB_PASSWORD'),
-    'host': os.environ.get('DB_HOST'),
-    'port': int(os.environ.get('DB_PORT')),
-    'options': '-c search_path=content',
-}
+class Settings(BaseSettings):
+    dbname: str = Field(..., env='DB_NAME')
+    user: str = Field(..., env='DB_USER')
+    password: str = Field(..., env='DB_PASSWORD')
+    host: str = Field(..., env='DB_HOST')
+    port: int = Field(..., env='DB_PORT')
+    options: str = '-c search_path=content'
+
+    class Config:
+        env_file = '.env'
+
+
+settings = Settings().dict()
 
 
 class Extractor:
@@ -53,9 +53,9 @@ class Extractor:
         self.curs = None
         self.connect()
 
-    @backoff()
+    @backoff(logger=logger, log_msg='Не удалось установить соединение с БД.')
     def connect(self):
-        self.conn = psycopg2.connect(**params)
+        self.conn = psycopg2.connect(**settings)
         self.curs = self.conn.cursor()
 
     def close_connection(self):
@@ -72,7 +72,7 @@ class Extractor:
             self.connect()
             self.executor(query, condition)
 
-    def find_modified_data(self) -> iter:
+    def find_modified_data(self) -> Generator:
         # Запрос на получение id измененных фильмов.
         query = """
             WITH vars(mod_time) as (values (%s))

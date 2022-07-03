@@ -14,41 +14,52 @@
 """
 
 import json
-import os
-from pathlib import Path
+from http import HTTPStatus
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
+from pydantic import BaseSettings, Field
 
 from backoff import backoff
 from es_index import index
+from logger import loader_logger as logger
 
-path = Path(__file__).resolve().parent
-load_dotenv(''.join([str(path), '/.env']))
+
+class Settings(BaseSettings):
+    host: str = Field(..., env='ES_HOST')
+    port: int = Field(..., env='ES_PORT')
+
+    class Config:
+        env_file = '.env'
 
 
 class Loader:
 
     def __init__(self):
-        self.host = os.environ.get('ES_HOST')
-        self.port = os.environ.get('ES_PORT')
+        self.params = Settings().dict()
+        self.host = self.params.get('host')
+        self.port = self.params.get('port')
         # Проверка существования индекса при первом подключении.
         self.connector(req='get', tail='/_cat/indices/movies')
 
-    @backoff()
-    def connector(self, **kwargs) -> Any:
-        req = kwargs.get('req', 'post')             # Тип запроса: get, put, post.
-        tail = kwargs.get('tail', '/movies/_bulk')  # Хвост адреса для запроса.
-        data = kwargs.get('data', None)
-
+    @backoff(logger=logger, log_msg='Ошибка выполнения запроса к ES.')
+    def connector(
+        self,
+        req: str = 'post',
+        tail: str = '/movies/_bulk',
+        data: Any = None,
+    ) -> Any:
+        # req: тип запроса (get, put, post).
+        # tail: хвост адреса для запроса.
         request_method = getattr(requests, req)
-        url = self.host + ':' + self.port + tail
+        url = ''.join([self.host, ':', str(self.port), tail])
+        print(url)
         headers = {'Content-Type': 'application/json'}
 
         response = request_method(url, data=data, headers=headers)
 
-        if req == 'get' and response.status_code != 200:
+        if req == 'get' and response.status_code == HTTPStatus.NOT_FOUND:
             # Создание индекса.
             self.connector(req='put', tail='/movies', data=json.dumps(index))
+            logger.info('Индекс ES создан.')
         return response

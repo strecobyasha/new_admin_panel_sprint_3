@@ -34,6 +34,14 @@ services:
 
   transfer:
     build: ./postgres_to_es
+    environment:
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: ${DB_PORT}
+      DB_HOST: ${DB_HOST}
+      ES_HOST: ${ES_HOST}
+      ES_PORT: ${ES_PORT}
     depends_on:
       - db
 

@@ -11,10 +11,16 @@
 import time
 from functools import wraps
 
-from logger import extractor_logger, loader_logger
+from logger import manager_logger
 
 
-def backoff(start_sleep_time=0.1, factor=2, border_sleep_time=10):
+def backoff(
+    logger: object = manager_logger,
+    log_msg: str = '',
+    start_sleep_time=0.1,
+    factor=2,
+    border_sleep_time=10,
+):
     def func_wrapper(func):
         @wraps(func)
         def inner(*args, **kwargs):
@@ -23,11 +29,7 @@ def backoff(start_sleep_time=0.1, factor=2, border_sleep_time=10):
                 try:
                     return func(*args, **kwargs)
                 except Exception as ex:
-                    if type(ex).__name__ == 'OperationalError':
-                        extractor_logger.error('Не удалось установить соединение с БД.')
-                    else:
-                        print('error', sleep_time)
-                        loader_logger.error('Ошибка выполнения запроса к ES.')
+                    logger.error(f'{log_msg}, {ex}')
                     time.sleep(min(sleep_time, border_sleep_time))
                     sleep_time *= factor
 

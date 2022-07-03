@@ -8,46 +8,53 @@
 """
 
 import json
+import uuid
+from datetime import datetime
+from typing import Any
+
+from pydantic.dataclasses import dataclass
+
+
+@dataclass
+class Film:
+    film_id: uuid.UUID
+    rating: Any
+    title: str
+    descr: Any
+    persons: list
+    genres: list
+    latest_modified: datetime
 
 
 class Transformer:
 
     def transform(self, batch: list) -> tuple:
-        fields = (
-            'film_id',
-            'rating',
-            'title',
-            'descr',
-            'persons',
-            'genres',
-            'latest_modified',
-            )
 
         data_str = ''
         modified_at = None
 
         for film in batch:
-            data = dict(zip(fields, film))
-            persons_dict = self.get_persons_dict(data.get('persons'))
+            film_data = Film(*film)
+            persons_dict = self.get_persons_dict(film_data.persons)
 
-            modified_at = data.get('latest_modified').strftime('%Y-%m-%d %H:%M:%S.%f%z')
+            modified_at = film_data.latest_modified.strftime('%Y-%m-%d %H:%M:%S.%f%z')
 
             data_str += json.dumps(
                 {
                     'index': {
                         '_index': 'movies',
-                        '_id': data.get('film_id'),
+                        '_id': str(film_data.film_id),
                     },
                 },
             ) + '\n'
 
             data_str += json.dumps(
                 {
-                    'id': data.get('film_id'),
-                    'imdb_rating': data.get('rating'),
-                    'genre': data.get('genres'),
-                    'title': data.get('title'),
-                    'description': data.get('descr'),
+                    'id': str(film_data.film_id),
+                    'imdb_rating': film_data.rating,
+                    'genre': film_data.genres,
+                    'title': film_data.title,
+                    'description': film_data.descr,
                     'director': persons_dict['director'],
                     'actors_names': persons_dict['actors_names'],
                     'writers_names': persons_dict['writers_names'],
